@@ -2,75 +2,58 @@
 CrewAI agents for Invoice generation
 """
 from crewai import Agent, Task, Crew, Process
-from typing import Dict, List, Any, Optional
-import pandas as pd
+from typing import Dict, Optional
 import logging
 import os
 import traceback
 import openai
 import json
 from langchain_openai import ChatOpenAI
+from pydantic import BaseModel
+from tools.export import export_invoice_to_pdf  
 
 logger = logging.getLogger(__name__)
+# Define the Pydantic model for the blog
+class Invoice(BaseModel):
+    sender_info : str
+    recipient_info : str
+    due_date : str
+    transactions : list
+    quantities : list
+    unit_prices : list
+    unit_totals : list
+    total : str
 
-class Agents:
+class Invoice_Agents:
     """
-    Invoice creator agents using CrewAI.
+    Invoice creator agent using CrewAI.
     """
     
-    def __init__(self, invoice_text: str, openai_api_key: Optional[str] = None):
+    def __init__(self, invoice_text: str):
         """
-        Initialize the invoice processing agents.
+        Initialize the invoice processing agent.
         
         Args:
             invoice_text: String containing the invoice information
             openai_api_key: OpenAI API key for CrewAI agents
         """
-        self.invoice_text = invoice_text
-        self.openai_api_key = openai_api_key
-        self.openai_api_key = openai_api_key
-        
-        # Set OpenAI API key as environment variable if provided
-        if openai_api_key:
-            os.environ["OPENAI_API_KEY"] = openai_api_key
-            # Also set it directly in the openai module
-            openai.api_key = openai_api_key
-            
-            # Log that we've set the API key
-            logger.info("OpenAI API key has been set")
-            
-            # Test the OpenAI API key
-            try:
-                # Simple test call to OpenAI
-                llm = ChatOpenAI(
-                    model_name="gpt-3.5-turbo",
-                    temperature=0.7,
-                    openai_api_key=openai_api_key
-                )
-                response = llm.invoke("Test")
-                logger.info("OpenAI API key is valid")
-            except Exception as e:
-                logger.error(f"Error testing OpenAI API key: {str(e)}")
-                logger.error(traceback.format_exc())
-                raise ValueError(f"Invalid OpenAI API key: {str(e)}")
-    
-    def create_agents(self):
+        self.invoice_text = invoice_text        
+        # Test the OpenAI API ke
+    def create_agent(self):
         """
-        Create the financial analysis agents.
+        Create a single agent for parsing invoice data.
         
         Returns:
-            Tuple of (data_analyst, financial_advisor, budget_optimizer) agents
+            The invoice parser agent.
         """
-        # Create a language model
         llm = ChatOpenAI(
             model_name="gpt-4",
             temperature=0.7
         )
         
-        # Data Analyst Agent
-        invoice_parser  = Agent(
+        invoice_parser = Agent(
             role="Invoice Parser",
-            goal="Parse input text to extract invoice information",
+            goal="Parse input text to extract invoice information and return it as a structured dictionary.",
             backstory="""You are an expert in parsing and understanding invoice data. 
             You can accurately identify and extract key information from unstructured text.""",
             verbose=True,
@@ -78,35 +61,21 @@ class Agents:
             llm=llm
         )
         
-        # Field seperator agent
-        field_separator = Agent(
-            role="Field Separator",
-            goal="Separate parsed invoice information into structured fields",
-            backstory="""You specialize in organizing parsed data into structured formats. 
-            You ensure that all relevant invoice details are correctly categorized.""",
-            verbose=True,
-            allow_delegation=False,
-            llm=llm
-        )
-        
-        return invoice_parser, field_separator
+        return invoice_parser
 
-    
-    def create_tasks(self, invoice_parser,field_separator):
+    def create_task(self, invoice_parser):
         """
-        Create tasks for the financial analysis agents.
+        Create a task for the invoice parser agent.
         
         Args:
             invoice_parser: The invoice parser agent
-            field_separator: The field separator agent
-         
+            
         Returns:
-            List of tasks
+            The parsing task.
         """
-        # Example input text for an invoice
         invoice_text = self.invoice_text
         
-        # Parse the data for the invoice creator
+        # Create a parsing task for the AI to identify and extract invoice information
         parsing_task = Task(
             description=f"""
             Parse the following invoice text to extract key information:
@@ -117,64 +86,64 @@ class Agents:
             1. Sender information
             2. Recipient information
             3. Due date
-            4. Transactions
+            4. Transactions (these must be in singular tense e.g. (products -> product))
+            5. quantities
+            6. Unit prices (price per individual transaction unit)
+            7. totals (the total price of each unique transaction unit)
+            8. total (sum total of all transactions)
+
+            (Do NOT output currency as words, instead use the appropriate symbols and include them in 
+             unit prices, totals and the total)
+
+            (Add capital letters to person names and address names)
+
+            (Add a comma (,) at the end of the recipient and sender names (Person or company)to seperate them from their addresses)
+
+            (Write All dates as [NUMBER] [NAME OF MONTH] [YEAR NUMBER])
             
-            Your output should be a structured representation of the invoice data.
+            Return the output as a structured dictionary with the keys:
+            - sender_info
+            - recipient_info
+            - due_date
+            - transactions
+            - quantities
+            - unit_prices
+            - unit_totals
+            - total 
             """,
             agent=invoice_parser,
-            expected_output="Structured invoice data with fields for sender, recipient, due date, and transactions."
+            expected_output="Structured invoice data dicitonary with fields for sender, recipient, due date, and transactions.",
+            output_json=Invoice,
         )
         
-        # Create a financial advice task
-        separation_task = Task(
-            description=f"""
-            Organize the parsed invoice information into structured fields:
-            
-            - Sender Info
-            - Recipient Info
-            - Due Date
-            - Transactions
-            
-            Ensure that each field is clearly defined and contains the correct information.
-            """,
-            agent=field_separator,
-            expected_output="Separated fields with clear definitions for each invoice component."
-        )
-        
-        return [parsing_task, separation_task]
+        return parsing_task
 
-        
-    
     def run_analysis(self):
         """
-        Run the invoice parsing and field separation using CrewAI.
+        Run the invoice parsing using CrewAI.
         
         Returns:
             Dictionary with the parsed and structured invoice data
         """
-        if not self.openai_api_key:
-            raise ValueError("OpenAI API key is required for AI analysis")
-        
         try:
             logger.info("Starting invoice processing")
             
-            # Check if OpenAI API key is set
             if not os.environ.get("OPENAI_API_KEY"):
                 logger.error("OpenAI API key is not set")
                 return {
                     "error": "OpenAI API key is not set. Please provide a valid OpenAI API key."
                 }
             
-            # Create agents
-            invoice_parser, field_separator = self.create_agents()
+            # Create the agent
+            invoice_parser = self.create_agent()
             
-            # Create tasks
-            tasks = self.create_tasks(invoice_parser, field_separator)
+            # Create the task
+            task = self.create_task(invoice_parser)
             
-            # Create a crew with the agents and tasks
+            # Create a crew with the agent and task
             crew = Crew(
-                agents=[invoice_parser, field_separator],
-                tasks=tasks,
+                agents=[invoice_parser],
+                tasks=[task],
                 verbose=True,
                 process=Process.sequential
             )
@@ -184,64 +153,18 @@ class Agents:
             result = crew.kickoff()
             logger.info("Invoice processing complete")
             
+            # Log the entire result object for debugging
+            logger.info(f"Result object: {result}")
+            
             # Process results
             logger.info("Processing results...")
-            
-            try:
-                # Extract results from the crew's output
-                parsed_invoice = ""
-                structured_fields = ""
-                
-                # Log the type and structure of the result for debugging
-                logger.info(f"Result type: {type(result)}")
-                logger.info(f"Result attributes: {dir(result)}")
-                
-                # Check if the result has tasks attribute (newer CrewAI versions)
-                if hasattr(result, 'tasks'):
-                    logger.info(f"Found tasks attribute with {len(result.tasks)} tasks")
-                    for i, task_result in enumerate(result.tasks):
-                        logger.info(f"Processing task {i+1}")
-                        task_description = task_result.description.lower() if hasattr(task_result, 'description') else ""
-                        task_output = task_result.output if hasattr(task_result, 'output') else ""
-                        
-                        if "parse the following invoice text" in task_description:
-                            parsed_invoice = task_output
-                        elif "organize the parsed invoice information" in task_description:
-                            structured_fields = task_output
-                
-                # If we still don't have results, use the string representation of the result
-                if not parsed_invoice:
-                    logger.info("Using string representation of result")
-                    result_str = str(result)
-                    
-					 # Try to extract sections based on headers
-                    if "# Parsed Invoice" in result_str:
-                        parts = result_str.split("# Parsed Invoice")
-                        if len(parts) > 1:
-                            parsed_invoice = parts[1].strip()
-                            if "# Structured Fields" in parsed_invoice:
-                                parsed_invoice, structured_fields = parsed_invoice.split("# Structured Fields")
-                                structured_fields = structured_fields.strip()
-                
-                return {
-                    "parsed_invoice": parsed_invoice,
-                    "structured_fields": structured_fields
-                }
-            
-            except Exception as e:
-                logger.error(f"Error processing results: {e}", exc_info=True)
-                error_message = f"Error processing results: {str(e)}\n\n"
-                error_message += traceback.format_exc()
-                
-                return {
-                    "error": error_message
-                }
+
+            return result
+        
         except Exception as e:
             logger.error(f"Error in run_analysis: {str(e)}")
             logger.error(traceback.format_exc())
             
-            # Return a meaningful error message
             return {
                 "error": f"Error during analysis: {str(e)}"
             }
-					
