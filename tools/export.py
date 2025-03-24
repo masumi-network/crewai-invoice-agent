@@ -54,7 +54,7 @@ def  export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) -
     recipient_info = invoice_data['recipient_info']
     pdf.multi_cell(0, 8, recipient_info)
     pdf.ln(5)
-    
+ 
     # Due Date
     pdf.set_font("Arial", "B", 14)
     pdf.cell(0, 10, "Due Date", ln=True)

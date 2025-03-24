@@ -75,7 +75,7 @@ async def start_job(request_body: StartJobRequest):
     
     invoice_info = {"text": request_body.text}
     crew = Invoice_Agents(invoice_info)
-    result = crew.run_analyisis()
+    result = crew.run_analysis()
 
     InvoicePDF = export_invoice_to_pdf(result)
 
@@ -215,6 +215,3 @@ if __name__ == "__main__":
         uvicorn.run(app, host="0.0.0.0", port=8000)
     else:
         main()
-
-
-    
