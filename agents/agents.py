@@ -15,6 +15,7 @@ from tools.export import export_invoice_to_pdf
 logger = logging.getLogger(__name__)
 # Define the Pydantic model for the blog
 class Invoice(BaseModel):
+    logo : str
     sender_info : str
     recipient_info : str
     due_date : str
@@ -91,6 +92,7 @@ class Invoice_Agents:
             6. Unit prices (price per individual transaction unit)
             7. totals (the total price of each unique transaction unit)
             8. total (sum total of all transactions)
+            9. Company logo (will be a hexadecimal number)
 
             (Do NOT output currency as words, instead use the appropriate symbols and include them in 
              unit prices, totals and the total)
@@ -102,6 +104,7 @@ class Invoice_Agents:
             (Write All dates as [NUMBER] [NAME OF MONTH] [YEAR NUMBER])
             
             Return the output as a structured dictionary with the keys:
+            - logo (the provided hexadecimal number, if none are present put "None" in this field instead)
             - sender_info
             - recipient_info
             - due_date

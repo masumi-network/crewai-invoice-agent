@@ -34,11 +34,20 @@ def  export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) -
     pdf.add_page()
     
     # Set up fonts
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Invoice", ln=True, align="C")
     pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 10, f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align="C")
-    pdf.ln(10)
+    pdf.set_fill_color(r =24, g =244, b = 84)
+    pdf.cell(0, 5, "", ln=True, fill = True)
+    pdf.set_fill_color(r =255)
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(0, 15, "", ln=True, fill = True)
+
+
+    pdf.set_font("Helvetica", "B", 25)
+    pdf.cell(0, 10, "INVOICE", ln=True, align="L")
+
+    #pdf.set_font("Arial", "", 12)
+    #pdf.cell(0, 10, f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align="C")
+    #pdf.ln(10)
     
     # Sender and Recipient Information
     pdf.set_font("Arial", "B", 14)
