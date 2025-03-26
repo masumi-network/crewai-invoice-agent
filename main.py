@@ -184,10 +184,10 @@ def main():
         
         # Run analysis
         results = agents.run_analysis()
-
-        print(results["logo"])
         
-        export_path = export_invoice_to_pdf(results)
+
+        
+            
 
         # Check for errors
         print("Here is your Invoice PDF: {export_path}")

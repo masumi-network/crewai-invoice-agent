@@ -16,14 +16,17 @@ logger = logging.getLogger(__name__)
 # Define the Pydantic model for the blog
 class Invoice(BaseModel):
     logo : str
-    sender_info : str
-    recipient_info : str
+    sender_info : list
+    sender_country :str
+    recipient_info : list
+    recipient_country: str
     due_date : str
     transactions : list
     quantities : list
     unit_prices : list
     unit_totals : list
     total : str
+
 
 class Invoice_Agents:
     """
@@ -84,35 +87,47 @@ class Invoice_Agents:
             {invoice_text}
             
             Focus on identifying:
-            1. Sender information
-            2. Recipient information
-            3. Due date
-            4. Transactions (these must be in singular tense e.g. (products -> product))
-            5. quantities
-            6. Unit prices (price per individual transaction unit)
-            7. totals (the total price of each unique transaction unit)
-            8. total (sum total of all transactions)
-            9. Company logo (will be a hexadecimal number)
+            1. Sender information 
+            (Sender information is an array, The first element should be the Person / Company name, The following elements
+             Are to be the address information, from smallest to biggest i.e. building(if applicable), street name, Town/ City etc. 
+             As long as the address is split evenly between elements. do NOT include the country, this will be a seperate field.)
+
+            2. Sender Country (the country of the sender, if none are provided put COUNTRY REQUIRED in this field insteady)
+            3. Recipient information
+             (Recipient information is an array, The first element should be the Person / Company name, The following elements
+             Are to be the address information, from smallest to biggest i.e. building(if applicable), street name, Town/ City etc. 
+             As long as the address is split evenly between elements. do NOT include the country, this will be a seperate field.)
+
+            4. Recipient Country(The country of the recipient, if none are provided put COUNTRY REQUIRED in this field instead)
+            5. Due date
+            6. Transactions (these must be in singular tense e.g. (products -> product))
+            7. quantities
+            8. Unit prices (price per individual transaction unit)
+            9. totals (the total price of each unique transaction unit)
+            10. total (sum total of all transactions)
+            11. Company logo (will be a filepath to an image)
+          
 
             (Do NOT output currency as words, instead use the appropriate symbols and include them in 
              unit prices, totals and the total)
 
             (Add capital letters to person names and address names)
 
-            (Add a comma (,) at the end of the recipient and sender names (Person or company)to seperate them from their addresses)
-
             (Write All dates as [NUMBER] [NAME OF MONTH] [YEAR NUMBER])
             
             Return the output as a structured dictionary with the keys:
-            - logo (the provided hexadecimal number, if none are present put "None" in this field instead)
+            - logo (the provided filepath to the logo image, if none are present put "None" in this field instead)
             - sender_info
+            - sender_country
             - recipient_info
+            - recipient_country
             - due_date
             - transactions
             - quantities
             - unit_prices
             - unit_totals
             - total 
+           
             """,
             agent=invoice_parser,
             expected_output="Structured invoice data dicitonary with fields for sender, recipient, due date, and transactions.",

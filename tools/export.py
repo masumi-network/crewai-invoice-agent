@@ -38,31 +38,36 @@ def  export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) -
     pdf.set_fill_color(r =24, g =244, b = 84)
     pdf.cell(0, 5, "", ln=True, fill = True)
     pdf.set_fill_color(r =255)
-    pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 15, "", ln=True, fill = True)
+    pdf.set_font("Arial", "", 15)
+    pdf.cell(0, 20, "", ln=True, fill = True)
 
 
     pdf.set_font("Helvetica", "B", 25)
-    pdf.cell(0, 10, "INVOICE", ln=True, align="L")
+    pdf.cell(20, 10, "INVOICE", ln=True, align="L")
 
     #pdf.set_font("Arial", "", 12)
     #pdf.cell(0, 10, f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align="C")
     #pdf.ln(10)
     
     # Sender and Recipient Information
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, "Sender Information", ln=True)
-    pdf.set_font("Arial", "", 12)
-    sender_info = invoice_data['sender_info']
-    pdf.multi_cell(0, 8, sender_info)
-    pdf.ln(5)
+    pdf.cell(0, 20, "", ln=True, fill = True)
+    pdf.image(invoice_data['logo'],x = 155, y= 20 ,w = 35, h = 35)
+
     
+    pdf.set_font("Helvetica", "", 12)
+    for line in invoice_data['sender_info']:
+        pdf.cell(0, 0, line, ln=True, align="L")
+        pdf.ln(5)
+       
+
+    """""
     pdf.set_font("Arial", "B", 14)
     pdf.cell(0, 10, "Recipient Information", ln=True)
     pdf.set_font("Arial", "", 12)
     recipient_info = invoice_data['recipient_info']
     pdf.multi_cell(0, 8, recipient_info)
     pdf.ln(5)
+    """""
  
     # Due Date
     pdf.set_font("Arial", "B", 14)
