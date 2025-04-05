@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from tools.web_scraper import search_invoice_regulations
 from agents.data_cleaner import Cleaning_Agents
+from openai.error import RateLimitError  # Import the RateLimitError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -118,13 +119,20 @@ async def start_job(request_body: StartJobRequest):
         }
     
     
-    legal_info = search_invoice_regulations(request_body.sender_country,request_body.recipient_country)
-    cleaning_crew = Cleaning_Agents(legal_info['content'])
+    try:
+        legal_info = search_invoice_regulations(request_body.sender_country, request_body.recipient_country)
+        cleaning_crew = Cleaning_Agents(legal_info['content'])
+        legal_info = cleaning_crew.clean_Data()
+        
+        invoice_crew = Invoice_Agents(invoice_info, legal_info)
+        result, legal = invoice_crew.run_analysis()
 
-    legal_info = cleaning_crew.clean_Data()
-    
-    invoice_crew = Invoice_Agents(invoice_info,legal_info)
-    result,legal = invoice_crew.run_analysis()
+    except RateLimitError as e:
+        logger.error(f"Rate limit exceeded: {e}")
+        return {
+            "status": "error",
+            "message": "Quota exceeded. Please check your plan and billing details."
+        }
 
     # Initialize extra_info in the result
     result["extra_info"] = []  # Initialize an empty list for extra information
