@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from tools.web_scraper import search_invoice_regulations
 from agents.data_cleaner import Cleaning_Agents
-from openai.error import RateLimitError  # Import the RateLimitError
+from litellm.exceptions import RateLimitError  # Import the RateLimitError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -83,7 +83,7 @@ async def start_job(request_body: StartJobRequest):
     Sender: {request_body.sender}
     Sender Address: {request_body.sender_address}
     Sender Contact: {request_body.sender_contact}
-    Sender Contact: {request_body.sender_country}
+    Sender Country: {request_body.sender_country}
     
     Recipient: {request_body.recipient}
     Recipient Address: {request_body.recipient_address}
@@ -108,23 +108,15 @@ async def start_job(request_body: StartJobRequest):
         "invoice_info": invoice_info
     }
 
-      # Here you invoke your crew
-      
-   
-    if invoice_info.strip() == "Complete":
-        jobs[job_id]["status"] = "completed"
-        return {
-            "status": "success",
-            "job_id": job_id
-        }
-    
-    
+    # Here you invoke your crew
     try:
         legal_info = search_invoice_regulations(request_body.sender_country, request_body.recipient_country)
         cleaning_crew = Cleaning_Agents(legal_info['content'])
         legal_info = cleaning_crew.clean_Data()
         
         invoice_crew = Invoice_Agents(invoice_info, legal_info)
+        
+        # Attempt to run analysis and unpack results
         result, legal = invoice_crew.run_analysis()
 
     except RateLimitError as e:
@@ -132,6 +124,18 @@ async def start_job(request_body: StartJobRequest):
         return {
             "status": "error",
             "message": "Quota exceeded. Please check your plan and billing details."
+        }
+    except ValueError as e:
+        logger.error(f"ValueError during analysis: {e}")
+        return {
+            "status": "error",
+            "message": "Analysis failed due to unexpected result format."
+        }
+    except Exception as e:
+        logger.error(f"Unexpected error during analysis: {e}")
+        return {
+            "status": "error",
+            "message": "An unexpected error occurred during analysis."
         }
 
     # Initialize extra_info in the result
