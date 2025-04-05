@@ -37,7 +37,7 @@ class Invoice_Agents:
     Invoice creator agent using CrewAI.
     """
     
-    def __init__(self, invoice_text: str,legal_data:str = 'None'):
+    def __init__(self, invoice_text: str,legal_data:str):
         """
         Initialize the invoice processing agent.
         
@@ -132,7 +132,7 @@ class Invoice_Agents:
 
             (Add capital letters to person names and address names)
 
-            (Write All dates as [NUMBER](add a zero if single digits i.e., 01, 06    etc.)  [NAME OF MONTH] [COMMA] [YEAR NUMBER])
+            (Write All dates as [NUMBER](add a zero if single digits i.e., 01, 06, etc.)  [NAME OF MONTH] [COMMA] [YEAR NUMBER])
             
             Return the output as a structured dictionary with the keys:
             - sender_info (as a list)

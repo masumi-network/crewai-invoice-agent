@@ -94,6 +94,8 @@ async def start_job(request_body: StartJobRequest):
     Transactions: {request_body.transactions}
     
     Logo: {request_body.logo}
+
+    Additional Info: "None"
     """
     
     jobs[job_id] = {
@@ -101,7 +103,8 @@ async def start_job(request_body: StartJobRequest):
         "payment_id": payment_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "input_data": invoice_info,
-        "result": None
+        "result": None,
+        "invoice_info": invoice_info
     }
 
       # Here you invoke your crew
@@ -116,14 +119,15 @@ async def start_job(request_body: StartJobRequest):
     
     
     legal_info = search_invoice_regulations(request_body.sender_country,request_body.recipient_country)
-
     cleaning_crew = Cleaning_Agents(legal_info['content'])
 
     legal_info = cleaning_crew.clean_Data()
     
     invoice_crew = Invoice_Agents(invoice_info,legal_info)
-    
     result,legal = invoice_crew.run_analysis()
+
+    # Initialize extra_info in the result
+    result["extra_info"] = []  # Initialize an empty list for extra information
 
     InvoicePDF = export_invoice_to_pdf(result)
     
@@ -180,6 +184,19 @@ async def provide_input(request_body: ProvideInputRequest):
     if job["status"] != "awaiting input":
         return {"status": "error", "message": "Job is not awaiting input"}
     
+    # Append new information to the Additional Info field
+    if request_body.text.strip():
+        # Update the invoice_info with the new additional info
+        additional_info = f"{request_body.text.strip()}"
+        job["invoice_info"] = job["invoice_info"].replace('Additional Info: "None"', f'Additional Info: "{additional_info}"')
+        
+        # Update the Invoice_Agents crew with the modified invoice_info
+        invoice_crew = Invoice_Agents(job["invoice_info"], job["result"]["legal_info"])
+        result, legal = invoice_crew.run_analysis()  # Re-run analysis with updated info
+
+        # Update the job result with the new analysis
+        job["result"] = result
+
     if request_body.text.strip() == "Complete":
         job["status"] = "completed"
         return {
@@ -190,12 +207,9 @@ async def provide_input(request_body: ProvideInputRequest):
     
    
 
-    crew = Invoice_Agents(request_body.text)
-    result = crew.run_analysis()
-
-    InvoicePDF = export_invoice_to_pdf(result)
+    InvoicePDF = export_invoice_to_pdf(job["result"])
     
-    # 5. Update job with new result
+    # Update job with new result
     job["result"] = InvoicePDF
     job["status"] = "awaiting input"
 
@@ -257,8 +271,46 @@ def main():
         
     """
     try:
-        text = tool.run()
-        print(text)
+        sample_invoice = {
+    "sender_info": [
+        "Franz Shih.",
+        "198 New Seskin Court", 
+        "Whitestown Way"
+    ],
+    "sender_country": "Ireland",
+    "recipient_info": [
+        "utxo AG",
+        "Döttingerstrasse 21",
+        "CH5303 Würenlingen"
+    ],
+    "recipient_country": "Switzerland",
+    "due_date": "02/05/25",
+    "transactions": [
+        "Customer service",
+        "NMKR agent",
+        "Masumi Payment"
+    ],
+    "quantities": [
+        "1""""""",  # Assuming each transaction is for one unit
+        "2",
+        "1"
+    ],
+    "unit_prices": [
+        "30.00",
+        "40.00",
+        "25.00"
+    ],
+    "unit_totals": [
+        "30.00",
+        "40.00",
+        "25.00"
+    ],
+    "total": "95.00",  # Total of all transactions
+    "logo": "C:/Users/hungl/Downloads/logo.png",
+    "legal": "CH VAT CHE494.509.135 MWST",
+    "payment_notes":"IBAN: CH30 0857 3102 5022 0181 4"
+      # Placeholder for legal analysis
+}
 
         # Create invoice processing agents
         """
@@ -275,11 +327,11 @@ def main():
             print(f"Error processing invoice: {results['error']}")
         else:
             print("Invoice processed successfully!")
-            
+            """   
             # Export to PDF
-            export_path = export_invoice_to_pdf(results)
-            print(f"Invoice exported to PDF: {export_path}")
-    """
+        export_path = export_invoice_to_pdf(sample_invoice)
+        print(f"Invoice exported to PDF: {export_path}")
+  
     except Exception as e:
         error_msg = str(e)
         stack_trace = traceback.format_exc()

@@ -130,6 +130,8 @@ def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) ->
 
     pdf.cell(0, 0, invoice_data['recipient_country'], ln=True, align="L")
     pdf.ln(5)
+    pdf.cell(0, 0, invoice_data['legal'], ln=True, align="L")
+    pdf.ln(15)
 
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(80, 10, "Description", 1)
@@ -156,18 +158,22 @@ def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) ->
           # Accumulate subtotal
 
     # Subtotal
-    pdf.cell(80, 10, "Subtotal", 1)
-    pdf.cell(30, 10, "", 1)
-    pdf.cell(40, 10, "", 1)
-    pdf.cell(40, 10, invoice_data['total'], 1)
+    pdf.set_font("Helvetica", "B", 12)# No border
+    pdf.cell(30, 10, "", 0)  # Empty cell for spacing
+    pdf.cell(80, 10, "", 0)
+    pdf.cell(40, 10, "Subtotal", 0)
+    pdf.cell(40, 10, invoice_data['total'], 0)  # Subtotal value
     pdf.ln()
 
     total = subtotal
-    pdf.cell(80, 10, "Total", 1)
-    pdf.cell(30, 10, "", 1)
-    pdf.cell(40, 10, "", 1)
-    pdf.cell(40, 10, invoice_data['total'], 1)
+    pdf.cell(30, 10, "", 0)
+    pdf.cell(80, 10, "", 0)
+    pdf.cell(40, 10, "Total", 0)
+    pdf.cell(40, 10, invoice_data['total'], 0)
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "", 12)  # Set font for payment notes
+    pdf.cell(0, 10, "Payment Notes:", ln=True, align="L")  # Label for payment notes
+    pdf.multi_cell(0, 10, invoice_data['payment_notes'], align="L")  # Payment notes field
 
-    
     pdf.output(filename)
     return filename
