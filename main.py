@@ -48,13 +48,19 @@ class StartJobRequest(BaseModel):
     sender_address: str
     sender_country: str
     sender_contact: str
+    sender_VAT_if_applicable:str
     recipient: str
     recipient_address: str
     recipient_contact: str
     recipient_country: str
+    recipient_VAT_if_applicable:str
     due_date: str
     transactions:str
     logo: str
+    payment_instructions:str
+    invoice_notes:str
+    charges_if_applicable:str
+    currency:str
     
 
 
@@ -78,17 +84,23 @@ async def start_job(request_body: StartJobRequest):
     job_id = str(uuid.uuid4())
     payment_id = str(uuid.uuid4())  # Placeholder, in production track real payment
 
+    # Determine VAT values
+    sender_VAT = request_body.sender_VAT_if_applicable if request_body.sender_VAT_if_applicable else "None"
+    recipient_VAT = request_body.recipient_VAT_if_applicable if request_body.recipient_VAT_if_applicable else "None"
+
     # For demonstration: set job status to 'awaiting payment'
     invoice_info = f"""
     Sender: {request_body.sender}
     Sender Address: {request_body.sender_address}
     Sender Contact: {request_body.sender_contact}
     Sender Country: {request_body.sender_country}
+    Sender VAT: {sender_VAT}
     
     Recipient: {request_body.recipient}
     Recipient Address: {request_body.recipient_address}
     Recipient Country: {request_body.recipient_country}
     Recipient Contact: {request_body.recipient_contact}
+    Recipient VAT: {recipient_VAT}
     
     Due Date: {request_body.due_date}
     
@@ -97,6 +109,13 @@ async def start_job(request_body: StartJobRequest):
     Logo: {request_body.logo}
 
     Additional Info: "None"
+
+    Payment Instructions = {request_body.payment_instructions}
+
+    Invoice Notes = {request_body.invoice_notes}
+
+    Extra Charges = {request_body.charges_if_applicable}
+    Currency = {request_body.currency}
     """
     
     jobs[job_id] = {
@@ -231,9 +250,6 @@ async def provide_input(request_body: ProvideInputRequest):
         "current_pdf": InvoicePDF
     }
 
-   
-   
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 4) Check Server Availability (MIP-003: /availability)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -319,7 +335,7 @@ def main():
     ],
     "total": "95.00",  # Total of all transactions
     "logo": "C:/Users/hungl/Downloads/logo.png",
-    "legal": "CH VAT CHE494.509.135 MWST",
+    "reciever_VAT": "CH VAT CHE494.509.135 MWST",
     "payment_notes":"IBAN: CH30 0857 3102 5022 0181 4"
       # Placeholder for legal analysis
 }

@@ -58,7 +58,7 @@ def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) ->
     # Sender and Recipient Information
     
     pdf.cell(0, 20, "", ln=True, fill = True)
-    if invoice_data['logo'] != 'None':
+    if invoice_data['logo'] and invoice_data['logo'] != 'None':
         pdf.image(invoice_data['logo'],x = 155, y= 20 ,w = 35, h = 35)
 
 
@@ -100,6 +100,9 @@ def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) ->
 
     pdf.cell(0, 0, invoice_data['sender_country'], ln=True, align="L")
     pdf.ln(5)
+    if invoice_data['sender_VAT'] and invoice_data['sender_VAT'] != 'None':
+        pdf.cell(0, 0, invoice_data['sender_VAT'], ln=True, align="L")
+        pdf.ln(5)
     
 
     """""
@@ -130,7 +133,9 @@ def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) ->
 
     pdf.cell(0, 0, invoice_data['recipient_country'], ln=True, align="L")
     pdf.ln(5)
-    pdf.cell(0, 0, invoice_data['legal'], ln=True, align="L")
+    if invoice_data['reciever_VAT'] and invoice_data['reciever_VAT'] != 'None':
+        pdf.cell(0, 0, invoice_data['reciever_VAT'], ln=True, align="L")
+       
     pdf.ln(15)
 
     pdf.set_font("Helvetica", "B", 12)

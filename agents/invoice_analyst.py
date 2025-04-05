@@ -26,7 +26,12 @@ class Invoice(BaseModel):
     unit_totals : list
     total : str
     logo: str
-    legal: str
+    payment_instructions: str
+    invoice_notes: str
+    charges:str
+    charges_value:float
+    currency:str
+
     
 class LegalAnalysis(BaseModel):
     analysis: str
@@ -46,7 +51,7 @@ class Invoice_Agents:
             openai_api_key: OpenAI API key for CrewAI agents
         """
         self.invoice_text = invoice_text  
-        self.legal_data = legal_data      
+        self.legal_data = legal_data
         # Test the OpenAI API ke
     def create_agents(self):
         """
@@ -125,13 +130,16 @@ class Invoice_Agents:
             9. totals (the total price of each unique transaction unit)
             10. total (sum total of all transactions)
             11. Company logo (will be a filepath to an image for example logo: FILEPATH"
+            12. Sender VAT (if applicable, if none, put "None")
+            13. Recipient VAT (if applicable, if none, put "None")
 
-          
-            (Do NOT output currency as words, instead use the appropriate symbols and include them in 
+
+            (Do NOT output currency as words for the transaction totals, instead use the appropriate symbols and include them in 
              unit prices, totals and the total)
 
-            (Add capital letters to person names and address names)
+            
 
+            (Add capital letters to person names and address names)
             (Write All dates as [NUMBER](add a zero if single digits i.e., 01, 06, etc.)  [NAME OF MONTH] [COMMA] [YEAR NUMBER])
             
             Return the output as a structured dictionary with the keys:
@@ -146,6 +154,9 @@ class Invoice_Agents:
             - unit_totals (as a list)
             - total
             - logo (the provided filepath to the logo image, if none are present put "None" in this field instead)
+            - sender_VAT
+            - recipient_VAT
+            
             
             IMPORTANT: The output must be a valid JSON dictionary. All list fields must be properly formatted as lists.
 
@@ -251,7 +262,7 @@ class Invoice_Agents:
             logger.info("Invoice processing complete")
             logger.info(f"Result object: {parsed_invoice}")
 
-            
+
             
             return parsed_invoice,legal_analysis
             
