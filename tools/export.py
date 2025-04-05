@@ -11,10 +11,13 @@ import os
 import tempfile
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import random
+from datetime import datetime
+
 
 logger = logging.getLogger(__name__)
 
-def  export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) -> str:
+def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) -> str:
     """
     Export structured invoice data to a PDF file.
     
@@ -25,8 +28,11 @@ def  export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) -
     Returns:
         Path to the exported file
     """
+    timestamp = datetime.now().strftime("%Y%M%S")
+   
+    
+    current_date =  datetime.now().strftime("%d %B, %Y")
     if filename is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"invoice_{timestamp}.pdf"
     
     print("EXPORT DATA",invoice_data)
@@ -50,15 +56,51 @@ def  export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) -
     #pdf.ln(10)
     
     # Sender and Recipient Information
-    pdf.cell(0, 20, "", ln=True, fill = True)
-    pdf.image(invoice_data['logo'],x = 155, y= 20 ,w = 35, h = 35)
-
     
+    pdf.cell(0, 20, "", ln=True, fill = True)
+    if invoice_data['logo'] != 'None':
+        pdf.image(invoice_data['logo'],x = 155, y= 20 ,w = 35, h = 35)
+
+
+    invoice_number = str(timestamp)
+    issue_date = current_date
+    due_date = invoice_data['due_date']
+    start_y = pdf.get_y()
+
+
     pdf.set_font("Helvetica", "", 12)
-    for line in invoice_data['sender_info']:
+    pdf.cell(125)
+    pdf.cell(40, 0, "Invoice Number", ln=True, align="L")
+    pdf.ln(5)
+    pdf.cell(125)
+    pdf.cell(40, 0, "Issue Date", ln=True, align="L")
+    pdf.ln(5)
+    pdf.cell(125)
+    pdf.cell(40, 0, "Due Date", ln=True, align="L")
+
+    pdf.set_y(start_y)  # Move to right column
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(165)
+    pdf.cell(0, 0, invoice_number, ln=True, align="L")
+    pdf.ln(5)
+    pdf.cell(165)
+    pdf.cell(0, 0, issue_date, ln=True, align="L")
+    pdf.ln(5)
+    pdf.cell(165)
+    pdf.cell(0, 0, due_date, ln=True, align="L")
+
+    pdf.set_xy(10, start_y) 
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 0, invoice_data['sender_info'][0], ln=True, align="L")
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "", 12)
+    for line in invoice_data['sender_info'][1:]:
         pdf.cell(0, 0, line, ln=True, align="L")
         pdf.ln(5)
-       
+
+    pdf.cell(0, 0, invoice_data['sender_country'], ln=True, align="L")
+    pdf.ln(5)
+    
 
     """""
     pdf.set_font("Arial", "B", 14)
@@ -70,21 +112,62 @@ def  export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) -
     """""
  
     # Due Date
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, "Due Date", ln=True)
-    pdf.set_font("Arial", "", 12)
-    due_date = invoice_data['due_date']
-    pdf.cell(0, 8, f"Due Date: {due_date}", ln=True)
-    pdf.ln(5)
+   
     
     # Transactions
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, "Transactions", ln=True)
-    pdf.set_font("Arial", "", 12)
-    transactions = invoice_data['transactions']
-    for transaction in transactions:
-        pdf.multi_cell(0, 8, transaction)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, "Bill To", ln=True)
+    current_x, current_y = pdf.get_x(), pdf.get_y()
+    pdf.line(current_x,current_y,current_x+50,current_y)
     pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 0, invoice_data['recipient_info'][0], ln=True, align="L")
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "", 12)
+    for line in invoice_data['recipient_info'][1:]:
+        pdf.cell(0, 0, line, ln=True, align="L")
+        pdf.ln(5)
+
+    pdf.cell(0, 0, invoice_data['recipient_country'], ln=True, align="L")
+    pdf.ln(5)
+
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(80, 10, "Description", 1)
+    pdf.cell(30, 10, "Quantity", 1)
+    pdf.cell(40, 10, "Unit Price", 1)
+    pdf.cell(40, 10, "Unit Total", 1)
+    pdf.ln()
+
+    # Transaction Data
+    pdf.set_font("Helvetica", "", 12)
+    subtotal = 0
+    for i in range(len(invoice_data['transactions'])):
+        description = invoice_data['transactions'][i]
+        quantity = invoice_data['quantities'][i]
+        unit_price = invoice_data['unit_prices'][i]
+        unit_total = invoice_data['unit_totals'][i]
+
+        pdf.cell(80, 10, description, 1)
+        pdf.cell(30, 10, str(quantity), 1)
+        pdf.cell(40, 10, unit_price, 1)
+        pdf.cell(40, 10, unit_total, 1)
+        pdf.ln()
+
+          # Accumulate subtotal
+
+    # Subtotal
+    pdf.cell(80, 10, "Subtotal", 1)
+    pdf.cell(30, 10, "", 1)
+    pdf.cell(40, 10, "", 1)
+    pdf.cell(40, 10, invoice_data['total'], 1)
+    pdf.ln()
+
+    total = subtotal
+    pdf.cell(80, 10, "Total", 1)
+    pdf.cell(30, 10, "", 1)
+    pdf.cell(40, 10, "", 1)
+    pdf.cell(40, 10, invoice_data['total'], 1)
+
     
     pdf.output(filename)
     return filename

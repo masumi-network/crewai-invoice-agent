@@ -7,13 +7,14 @@ import uuid
 import uvicorn
 import traceback
 from typing import Dict,List, Optional
-from agents.agents import Invoice_Agents
+from agents.invoice_analyst import Invoice_Agents
 from tools.export import export_invoice_to_pdf  
 from dotenv import load_dotenv
 from fastapi import FastAPI, Query
 from pydantic import BaseModel
 from datetime import datetime, timezone
-
+from tools.web_scraper import search_invoice_regulations
+from agents.data_cleaner import Cleaning_Agents
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -42,10 +43,23 @@ class KeyValuePair(BaseModel):
 
 class StartJobRequest(BaseModel):
     # Per MIP-003, input_data should be defined under input_schema endpoint
-    text: str
+    sender: str
+    sender_address: str
+    sender_country: str
+    sender_contact: str
+    recipient: str
+    recipient_address: str
+    recipient_contact: str
+    recipient_country: str
+    due_date: str
+    transactions:str
+    logo: str
+    
+
 
 class ProvideInputRequest(BaseModel):
     job_id: str
+    text: str
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1) Start Job (MIP-003: /start_job)
@@ -64,30 +78,65 @@ async def start_job(request_body: StartJobRequest):
     payment_id = str(uuid.uuid4())  # Placeholder, in production track real payment
 
     # For demonstration: set job status to 'awaiting payment'
+    invoice_info = f"""
+    Sender: {request_body.sender}
+    Sender Address: {request_body.sender_address}
+    Sender Contact: {request_body.sender_contact}
+    Sender Contact: {request_body.sender_country}
+    
+    Recipient: {request_body.recipient}
+    Recipient Address: {request_body.recipient_address}
+    Recipient Country: {request_body.recipient_country}
+    Recipient Contact: {request_body.recipient_contact}
+    
+    Due Date: {request_body.due_date}
+    
+    Transactions: {request_body.transactions}
+    
+    Logo: {request_body.logo}
+    """
+    
     jobs[job_id] = {
-        "status": "awaiting payment",  # Could also be 'awaiting payment', 'running', etc.
+        "status": "awaiting payment",
         "payment_id": payment_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "input_data": request_body.text,
+        "input_data": invoice_info,
         "result": None
     }
+
       # Here you invoke your crew
+      
+   
+    if invoice_info.strip() == "Complete":
+        jobs[job_id]["status"] = "completed"
+        return {
+            "status": "success",
+            "job_id": job_id
+        }
     
-    invoice_info = {"text": request_body.text}
-    crew = Invoice_Agents(invoice_info)
-    result = crew.run_analysis()
+    
+    legal_info = search_invoice_regulations(request_body.sender_country,request_body.recipient_country)
+
+    cleaning_crew = Cleaning_Agents(legal_info['content'])
+
+    legal_info = cleaning_crew.clean_Data()
+    
+    invoice_crew = Invoice_Agents(invoice_info,legal_info)
+    
+    result,legal = invoice_crew.run_analysis()
 
     InvoicePDF = export_invoice_to_pdf(result)
-
-
-    # Store result as if we immediately completed it (placeholder)
-    jobs[job_id]["status"] = "completed"
+    
+    # Store the generated PDF
     jobs[job_id]["result"] = InvoicePDF
+    jobs[job_id]["status"] = "awaiting input"
 
+    # Check if user wants to continue or complete
     return {
-        "status": "success",
+        "status": "awaiting input",
         "job_id": job_id,
-        "payment_id": payment_id
+        "current_pdf": InvoicePDF,
+        "Invoice Analysis": legal['analysis']
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -128,7 +177,36 @@ async def provide_input(request_body: ProvideInputRequest):
 
     job = jobs[job_id]
 
-    return {"status": "success"}
+    if job["status"] != "awaiting input":
+        return {"status": "error", "message": "Job is not awaiting input"}
+    
+    if request_body.text.strip() == "Complete":
+        job["status"] = "completed"
+        return {
+            "status": "success",
+            "job_id": job_id,
+            "final_pdf": job["result"]
+        }
+    
+   
+
+    crew = Invoice_Agents(request_body.text)
+    result = crew.run_analysis()
+
+    InvoicePDF = export_invoice_to_pdf(result)
+    
+    # 5. Update job with new result
+    job["result"] = InvoicePDF
+    job["status"] = "awaiting input"
+
+    return {
+        "status": "awaiting input",
+        "job_id": job_id,
+        "current_pdf": InvoicePDF
+    }
+
+   
+   
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4) Check Server Availability (MIP-003: /availability)
@@ -170,25 +248,27 @@ def main():
     if not OPENAI_API_KEY:
         print("Error: OPENAI_API_KEY is missing. Please check your .env file.")
         return
-
+    """
     invoice_text = str(input("Enter invoice information:\n"))
 
     if not invoice_text.strip():
         print("Invoice data is required.")
         return
         
-    
+    """
     try:
+        text = tool.run()
+        print(text)
+
         # Create invoice processing agents
+        """
         agents = Invoice_Agents(invoice_text)
         
         # Run analysis
         results = agents.run_analysis()
-        
 
+        print(results['legal'])
         
-            
-
         # Check for errors
         print("Here is your Invoice PDF: {export_path}")
         if "error" in results:
@@ -199,7 +279,7 @@ def main():
             # Export to PDF
             export_path = export_invoice_to_pdf(results)
             print(f"Invoice exported to PDF: {export_path}")
-    
+    """
     except Exception as e:
         error_msg = str(e)
         stack_trace = traceback.format_exc()
@@ -207,6 +287,7 @@ def main():
         print("Error details:")
         print(stack_trace)
         logger.error(f"Error processing invoice: {e}", exc_info=True)
+        
 
 if __name__ == "__main__":
     import sys
