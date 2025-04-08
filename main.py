@@ -48,25 +48,28 @@ class StartJobRequest(BaseModel):
     sender_address: str
     sender_country: str
     sender_contact: str
-    sender_VAT_if_applicable:str
+    sender_tax_number:str
     recipient: str
     recipient_address: str
-    recipient_contact: str
     recipient_country: str
-    recipient_VAT_if_applicable:str
+    recipient_contact: str
+    recipient_tax_number:str
     due_date: str
     transactions:str
     logo: str
     payment_instructions:str
     invoice_notes:str
-    charges_if_applicable:str
-    currency:str
+    extra_charges: str
+    taxes: str
+    transaction_notes:str
+    #charges_if_applicable:str
+    #currency:str
     
 
 
 class ProvideInputRequest(BaseModel):
     job_id: str
-    text: str
+    additional_info: str
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1) Start Job (MIP-003: /start_job)
@@ -84,94 +87,77 @@ async def start_job(request_body: StartJobRequest):
     job_id = str(uuid.uuid4())
     payment_id = str(uuid.uuid4())  # Placeholder, in production track real payment
 
-    # Determine VAT values
-    sender_VAT = request_body.sender_VAT_if_applicable if request_body.sender_VAT_if_applicable else "None"
-    recipient_VAT = request_body.recipient_VAT_if_applicable if request_body.recipient_VAT_if_applicable else "None"
+
 
     # For demonstration: set job status to 'awaiting payment'
     invoice_info = f"""
     Sender: {request_body.sender}
     Sender Address: {request_body.sender_address}
-    Sender Contact: {request_body.sender_contact}
     Sender Country: {request_body.sender_country}
-    Sender VAT: {sender_VAT}
+    Sender Contact: {request_body.sender_contact}
+    Sender VAT: {request_body.sender_tax_number}
     
     Recipient: {request_body.recipient}
     Recipient Address: {request_body.recipient_address}
     Recipient Country: {request_body.recipient_country}
     Recipient Contact: {request_body.recipient_contact}
-    Recipient VAT: {recipient_VAT}
-    
+    Recpient VAT: {request_body.recipient_tax_number}
+ 
     Due Date: {request_body.due_date}
     
     Transactions: {request_body.transactions}
     
     Logo: {request_body.logo}
+    Payment Instructions: {request_body.payment_instructions}
+    Invoice Notes: {request_body.invoice_notes}
+
+    Extra Charges: {request_body.extra_charges}
+
+    Taxes: {request_body.taxes}
+
+    Transaction_notes: {request_body.transaction_notes}
 
     Additional Info: "None"
 
-    Payment Instructions = {request_body.payment_instructions}
-
-    Invoice Notes = {request_body.invoice_notes}
-
-    Extra Charges = {request_body.charges_if_applicable}
-    Currency = {request_body.currency}
     """
     
     jobs[job_id] = {
         "status": "awaiting payment",
         "payment_id": payment_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "input_data": invoice_info,
         "result": None,
-        "invoice_info": invoice_info
+        "invoice_info": invoice_info,
+        "legal_analysis": None
     }
 
     # Here you invoke your crew
-    try:
-        legal_info = search_invoice_regulations(request_body.sender_country, request_body.recipient_country)
-        cleaning_crew = Cleaning_Agents(legal_info['content'])
-        legal_info = cleaning_crew.clean_Data()
+    
+    legal_info = search_invoice_regulations(request_body.sender_country, request_body.recipient_country)
+    cleaning_crew = Cleaning_Agents(legal_info['content'])
+    legal_info = cleaning_crew.clean_Data()
         
-        invoice_crew = Invoice_Agents(invoice_info, legal_info)
+    invoice_crew = Invoice_Agents(invoice_info, legal_info)
         
         # Attempt to run analysis and unpack results
-        result, legal = invoice_crew.run_analysis()
-
-    except RateLimitError as e:
-        logger.error(f"Rate limit exceeded: {e}")
-        return {
-            "status": "error",
-            "message": "Quota exceeded. Please check your plan and billing details."
-        }
-    except ValueError as e:
-        logger.error(f"ValueError during analysis: {e}")
-        return {
-            "status": "error",
-            "message": "Analysis failed due to unexpected result format."
-        }
-    except Exception as e:
-        logger.error(f"Unexpected error during analysis: {e}")
-        return {
-            "status": "error",
-            "message": "An unexpected error occurred during analysis."
-        }
+    result,analysis = invoice_crew.run_analysis()
 
     # Initialize extra_info in the result
-    result["extra_info"] = []  # Initialize an empty list for extra information
+     # Initialize an empty list for extra information
 
     InvoicePDF = export_invoice_to_pdf(result)
     
     # Store the generated PDF
     jobs[job_id]["result"] = InvoicePDF
     jobs[job_id]["status"] = "awaiting input"
-
-    # Check if user wants to continue or complete
+    jobs[job_id]["legal_analysis"] = legal_info
+    
+    
     return {
         "status": "awaiting input",
         "job_id": job_id,
         "current_pdf": InvoicePDF,
-        "Invoice Analysis": legal['analysis']
+        "Invoice Analysis": analysis
+        
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -203,7 +189,7 @@ async def provide_input(request_body: ProvideInputRequest):
     Allows users to send additional input if a job is in an 'awaiting input' status.
     Fulfills MIP-003 /provide_input endpoint.
     
-    In this example we do not require any additional input, so it always returns success.
+    In this example we can add any additional info to the invoice, or fill in any required information.
     """
     job_id = request_body.job_id
 
@@ -216,38 +202,37 @@ async def provide_input(request_body: ProvideInputRequest):
         return {"status": "error", "message": "Job is not awaiting input"}
     
     # Append new information to the Additional Info field
-    if request_body.text.strip():
+    if request_body.additional_info.strip():
+        if request_body.additional_info.strip() == "Complete":
+            job["status"] = "completed"
+            return {
+                "status": "success",
+                "job_id": job_id,
+                "final_pdf": job["result"],
+            }
         # Update the invoice_info with the new additional info
-        additional_info = f"{request_body.text.strip()}"
+        additional_info = request_body.additional_info
         job["invoice_info"] = job["invoice_info"].replace('Additional Info: "None"', f'Additional Info: "{additional_info}"')
         
         # Update the Invoice_Agents crew with the modified invoice_info
-        invoice_crew = Invoice_Agents(job["invoice_info"], job["result"]["legal_info"])
+        invoice_crew = Invoice_Agents(job["invoice_info"], job["legal_analysis"])
         result, legal = invoice_crew.run_analysis()  # Re-run analysis with updated info
 
-        # Update the job result with the new analysis
-        job["result"] = result
 
-    if request_body.text.strip() == "Complete":
-        job["status"] = "completed"
-        return {
-            "status": "success",
-            "job_id": job_id,
-            "final_pdf": job["result"]
-        }
+
     
-   
-
-    InvoicePDF = export_invoice_to_pdf(job["result"])
+    InvoicePDF = export_invoice_to_pdf(result)
     
     # Update job with new result
     job["result"] = InvoicePDF
     job["status"] = "awaiting input"
 
+
     return {
         "status": "awaiting input",
         "job_id": job_id,
-        "current_pdf": InvoicePDF
+        "current_pdf": InvoicePDF,
+        "legal_analysis":legal
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
