@@ -28,9 +28,8 @@ def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) ->
         Path to the exported file
     """
     timestamp = datetime.now().strftime("%Y%M%S")
-   
-    
-    current_date =  datetime.now().strftime("%d %B, %Y")
+
+    current_date =  datetime.now().strftime("%d %B %Y")
     if filename is None:
         filename = f"invoice_{timestamp}.pdf"
     

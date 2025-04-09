@@ -62,14 +62,31 @@ class StartJobRequest(BaseModel):
     extra_charges: str
     taxes: str
     transaction_notes:str
-    #charges_if_applicable:str
-    #currency:str
+    currency:str
     
 
 
 class ProvideInputRequest(BaseModel):
     job_id: str
-    additional_info: str
+    sender: str
+    sender_address: str
+    sender_country: str
+    sender_contact: str
+    sender_tax_number:str
+    recipient: str
+    recipient_address: str
+    recipient_country: str
+    recipient_contact: str
+    recipient_tax_number:str
+    due_date: str
+    transactions:str
+    logo: str
+    payment_instructions:str
+    invoice_notes:str
+    extra_charges: str
+    taxes: str
+    transaction_notes:str
+    currency:str
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1) Start Job (MIP-003: /start_job)
@@ -87,37 +104,59 @@ async def start_job(request_body: StartJobRequest):
     job_id = str(uuid.uuid4())
     payment_id = str(uuid.uuid4())  # Placeholder, in production track real payment
 
+    invoice_dictionary = {
+        "sender": str(request_body.sender),
+        "sender_address": str(request_body.sender_address),
+        "sender_country": str(request_body.sender_country),
+        "sender_contact": str(request_body.sender_contact),
+        "sender_tax_number": str(request_body.sender_tax_number),
+        "recipient": str(request_body.recipient),
+        "recipient_address": str(request_body.recipient_address),
+        "recipient_country": str(request_body.recipient_country),
+        "recipient_contact": str(request_body.recipient_contact),
+        "recipient_tax_number": str(request_body.recipient_tax_number),
+        "due_date": str(request_body.due_date),
+        "transactions": str(request_body.transactions),
+        "logo": str(request_body.logo),
+        "payment_instructions": str(request_body.payment_instructions),
+        "invoice_notes": str(request_body.invoice_notes),
+        "extra_charges": str(request_body.extra_charges),
+        "taxes": str(request_body.taxes),
+        "transaction_notes": str(request_body.transaction_notes),
+        "currency": str(request_body.currency)
+    }
+
 
 
     # For demonstration: set job status to 'awaiting payment'
     invoice_info = f"""
-    Sender: {request_body.sender}
-    Sender Address: {request_body.sender_address}
-    Sender Country: {request_body.sender_country}
-    Sender Contact: {request_body.sender_contact}
-    Sender VAT: {request_body.sender_tax_number}
+    Sender: {invoice_dictionary["sender"]}
+    Sender Address: {invoice_dictionary["sender_address"]}
+    Sender Country: {invoice_dictionary["sender_country"]}
+    Sender Contact: {invoice_dictionary["sender_contact"]}
+    Sender tax number: {invoice_dictionary["sender_tax_number"]}
     
-    Recipient: {request_body.recipient}
-    Recipient Address: {request_body.recipient_address}
-    Recipient Country: {request_body.recipient_country}
-    Recipient Contact: {request_body.recipient_contact}
-    Recpient VAT: {request_body.recipient_tax_number}
+    Recipient: {invoice_dictionary["recipient"]}
+    Recipient Address: {invoice_dictionary["recipient_address"]}
+    Recipient Country: {invoice_dictionary["recipient_country"]}
+    Recipient Contact: {invoice_dictionary["recipient_contact"]}
+    Recpient tax number: {invoice_dictionary["recipient_tax_number"]}
  
-    Due Date: {request_body.due_date}
+    Due Date: {invoice_dictionary["due_date"]}
     
-    Transactions: {request_body.transactions}
+    Transactions: {invoice_dictionary["transactions"]}
     
-    Logo: {request_body.logo}
-    Payment Instructions: {request_body.payment_instructions}
-    Invoice Notes: {request_body.invoice_notes}
+    Logo: {invoice_dictionary["logo"]}
+    Payment Instructions: {invoice_dictionary["payment_instructions"]}
+    Invoice Notes: {invoice_dictionary["invoice_notes"]}
 
-    Extra Charges: {request_body.extra_charges}
+    Extra Charges: {invoice_dictionary["extra_charges"]}
 
-    Taxes: {request_body.taxes}
+    Taxes: {invoice_dictionary["taxes"]}
 
-    Transaction_notes: {request_body.transaction_notes}
+    Transaction_notes: {invoice_dictionary["transaction_notes"]}
 
-    Additional Info: "None"
+    Currency: {invoice_dictionary["currency"]}
 
     """
     
@@ -126,7 +165,7 @@ async def start_job(request_body: StartJobRequest):
         "payment_id": payment_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "result": None,
-        "invoice_info": invoice_info,
+        "invoice_info": invoice_dictionary,
         "legal_analysis": None
     }
 
@@ -148,16 +187,15 @@ async def start_job(request_body: StartJobRequest):
     
     # Store the generated PDF
     jobs[job_id]["result"] = InvoicePDF
-    jobs[job_id]["status"] = "awaiting input"
+    jobs[job_id]["status"] = "success"
     jobs[job_id]["legal_analysis"] = legal_info
     
     
     return {
-        "status": "awaiting input",
+        "status": "success",
         "job_id": job_id,
         "current_pdf": InvoicePDF,
         "Invoice Analysis": analysis
-        
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -186,7 +224,7 @@ async def check_status(job_id: str = Query(..., description="Job ID to check sta
 @app.post("/provide_input")
 async def provide_input(request_body: ProvideInputRequest):
     """
-    Allows users to send additional input if a job is in an 'awaiting input' status.
+    Allows users to send additional input.
     Fulfills MIP-003 /provide_input endpoint.
     
     In this example we can add any additional info to the invoice, or fill in any required information.
@@ -198,34 +236,83 @@ async def provide_input(request_body: ProvideInputRequest):
 
     job = jobs[job_id]
 
-    if job["status"] != "awaiting input":
-        return {"status": "error", "message": "Job is not awaiting input"}
     
     # Append new information to the Additional Info field
-    if request_body.additional_info.strip():
-        if request_body.additional_info.strip() == "Complete":
-            job["status"] = "completed"
-            return {
-                "status": "success",
-                "job_id": job_id,
-                "final_pdf": job["result"],
-            }
+
         # Update the invoice_info with the new additional info
-        additional_info = request_body.additional_info
-        job["invoice_info"] = job["invoice_info"].replace('Additional Info: "None"', f'Additional Info: "{additional_info}"')
-        
+
+
+    input_data = request_body.model_dump()
+
+    # Iterate over the input data and update the invoice_dictionary
+    for key, value in input_data.items():
+        if value not in [None, "string"]:  # Check if value is not None and not "string"
+            job["invoice_info"][key] = value
+        """    
+        job_id: str
+        sender: str
+        sender_address: str
+        sender_country: str
+        sender_contact: str
+        sender_tax_number:str
+        recipient: str
+        recipient_address: str
+        recipient_country: str
+        recipient_contact: str
+        recipient_tax_number:str
+        due_date: str
+        transactions:str
+        logo: str
+        payment_instructions:str
+        invoice_notes:str
+        extra_charges: str
+        taxes: str
+        transaction_notes:str
+        currency:str
+        """
         # Update the Invoice_Agents crew with the modified invoice_info
-        invoice_crew = Invoice_Agents(job["invoice_info"], job["legal_analysis"])
-        result, legal = invoice_crew.run_analysis()  # Re-run analysis with updated info
+    invoice_info = f"""
+    Sender: {job["invoice_info"]["sender"]}
+    Sender Address: {job["invoice_info"]["sender_address"]}
+    Sender Country: {job["invoice_info"]["sender_country"]}
+    Sender Contact: {job["invoice_info"]["sender_contact"]}
+    Sender tax number: {job["invoice_info"]["sender_tax_number"]}
+    
+    Recipient: {job["invoice_info"]["recipient"]}
+    Recipient Address: {job["invoice_info"]["recipient_address"]}
+    Recipient Country: {job["invoice_info"]["recipient_country"]}
+    Recipient Contact: {job["invoice_info"]["recipient_contact"]}
+    Recpient tax number: {job["invoice_info"]["recipient_tax_number"]}
+
+    Due Date: {job["invoice_info"]["due_date"]}
+    
+    Transactions: {job["invoice_info"]["transactions"]}
+        
+    Logo: {job["invoice_info"]["logo"]}
+    Payment Instructions: {job["invoice_info"]["payment_instructions"]}
+    Invoice Notes: {job["invoice_info"]["invoice_notes"]}
+
+    Extra Charges: {job["invoice_info"]["extra_charges"]}
+
+    Taxes: {job["invoice_info"]["taxes"]}
+
+    Transaction_notes: {job["invoice_info"]["transaction_notes"]}
+
+    Currency: {job["invoice_info"]["currency"]}
+
+    """
+    invoice_crew = Invoice_Agents(invoice_info, job["legal_analysis"])
+
+    result, legal = invoice_crew.run_analysis()  # Re-run analysis with updated info
 
 
 
     
     InvoicePDF = export_invoice_to_pdf(result)
     
-    # Update job with new result
+    #Update job with new result
     job["result"] = InvoicePDF
-    job["status"] = "awaiting input"
+    job["status"] = "Success"
 
 
     return {

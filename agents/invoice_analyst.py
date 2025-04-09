@@ -38,6 +38,7 @@ class Invoice(BaseModel):
     charges_amounts: list
     taxes: list
     tax_values: list
+    currency:str
 
     #charges: float  # Optional list of charges
     #charges_value: float  # Optional charges value, can be None
@@ -147,9 +148,8 @@ class Invoice_Agents:
                 And if the charge is negative i.e. a discount, add the value as a negative. e.g. Early discount -$20 -> -20)
             22. Taxes (provided tax such as VAT, Sales Tax, Goods and services Tax ETC)  if its a percentage charge, add the percentage in brackets beside it. e.g., VAT(10%)
             23. Tax values (write these as decimal tax values e.g. 12% -> 0.12) NO PERCENTAGE SYMBOLS
+            24. Currency (Write as 3 or 4 Letter abbreviation. e.g. USD)
 
-            IMPORTANT: if theres any meaningful content in "Additional info", try to delegate it to the field(s) that it belongs to following the guidelines of that field. e.g., if it is "Sender VAT number: XXX" 
-            Put it into sender tax number)
 
             IMPORTANT:
             1. All list fields must be Python lists, not strings
