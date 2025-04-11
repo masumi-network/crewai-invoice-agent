@@ -201,7 +201,7 @@ def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) ->
             pdf.cell(80, 10, "", 0)
             pdf.cell(40, 10, str(invoice_data['extra_charges'][i]), 0)
 
-            if(invoice_data['charges_amounts'][i][-1] == '%'):
+            if(invoice_data['extra_amounts'][i][-1] == '%'):
                 pdf.set_font("Helvetica", "", 12)
                 pdf.cell(40, 10, str(f"{subtotal* float(invoice_data['charges_amounts'][i][:-1]):.2f}"), 0 )
                 total += float(total * float(invoice_data['charges_amounts'][i]))
