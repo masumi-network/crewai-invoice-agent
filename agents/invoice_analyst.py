@@ -2,15 +2,11 @@
 CrewAI agents for Invoice generation
 """
 from crewai import Agent, Task, Crew, Process
-from typing import Dict, Optional
 import logging
 import os
-import traceback
-import openai
-import json
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
-from tools.export import export_invoice_to_pdf  
+from logging_config import get_logger 
 
 logger = logging.getLogger(__name__)
 # Define the Pydantic model for the blog
@@ -55,16 +51,12 @@ class Invoice_Agents:
     Invoice creator agent using CrewAI.
     """
     
-    def __init__(self, invoice_text: str,legal_data:str):
-        """
-        Initialize the invoice processing agent.
-        
-        Args:
-            invoice_text: String containing the invoice information
-            openai_api_key: OpenAI API key for CrewAI agents
-        """
+    def __init__(self,verbose = True, invoice_text: str = None,legal_data:str = None,logger = None):
+        self.verbose = verbose
+        self.logger = logger or get_logger(__name__)
         self.invoice_text = invoice_text  
         self.legal_data = legal_data
+        self.logger.info("Invoice Crew initialized")
         # Test the OpenAI API ke
     def create_agents(self):
         """
@@ -73,6 +65,7 @@ class Invoice_Agents:
         Returns:
             The invoice parser agent and the legal advisor agent.
         """
+        self.logger.info("Creating invoice crew with agents")
         llm = ChatOpenAI(
             model_name="gpt-4",
             temperature=0.7
@@ -83,7 +76,7 @@ class Invoice_Agents:
             goal="Parse input text to extract invoice information and return it as a structured dictionary.",
             backstory="""You are an expert in parsing and understanding invoice data. 
             You can accurately identify and extract key information from unstructured text.""",
-            verbose=True,
+            verbose=self.verbose,
             allow_delegation=False,
             llm=llm
         )
@@ -96,11 +89,11 @@ class Invoice_Agents:
             backstory="""You are an expert in legal advice and understanding invoice data. 
             You can accurately identify key information from unstructured text and consult laws regarding an invoice with
             said data..""",
-            verbose=True,
+            verbose=self.verbose,
             allow_delegation=False,
             llm=llm
         )
-        
+        self.logger.info("Created parser and legal analysis agents")
         return invoice_parser,legal_advisor
 
     def create_task(self, invoice_parser,legal_advisor):
@@ -113,6 +106,7 @@ class Invoice_Agents:
         Returns:
             The parsing task.
         """
+        self.logger.info("Creating invoice crew tasks")
         invoice_text = self.invoice_text
         legal_data = self.legal_data
         
@@ -171,7 +165,7 @@ class Invoice_Agents:
         legal_task = Task(
             description=f"""
             Analyse the following invoice text::
-            {invoice_text}
+            {invoice_text} 
 
             Make a professional legal analysis on said invoice text, to ensure that it is legally compliant.
             Assess on how compliant the invoice information is to the following legal guidelines:
@@ -216,7 +210,8 @@ class Invoice_Agents:
             expected_output="A string containing the legal analysis",
             output_json=LegalAnalysis # Changed to False since we're just returning a string
         )
-        
+        self.logger.info("Created parser and legal analysis tasks")
+        self.logger.info("Crew setup completed")
         return parsing_task,legal_task
     def run_analysis(self):
         """
