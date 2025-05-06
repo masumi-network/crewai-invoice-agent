@@ -187,9 +187,11 @@ async def execute_crew_task(data:StartJobRequest) -> dict:
             ACL='private',  # Defines Access-control List (ACL) permissions, such as private or public.
             Metadata={  # Defines metadata tags.
                 'x-amz-meta-my-key': InvoicePDF
-    )
-    
+            }
+        )
+
     logger.info("CrewAI task completed successfully")
+
     return InvoicePDF,analysis, invoice_dictionary
     
 # ─────────────────────────────────────────────────────────────────────────────
