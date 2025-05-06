@@ -2,6 +2,8 @@
 CrewAI Invoice generator Agent
 """
 import os
+import boto3
+import botocore
 import uuid
 import uvicorn
 import traceback
@@ -168,6 +170,24 @@ async def execute_crew_task(data:StartJobRequest) -> dict:
     InvoicePDF = export_invoice_to_pdf(result)
 
     #logger.info(f"Starting CrewAI task with input: {input_data}")
+    # Step 2: The new session validates your request and directs it to your Space's specified endpoint using the AWS SDK.
+    session = boto3.session.Session()
+    client = session.client('s3',
+                            endpoint_url = os.getenv('SPACES_ENDPOINT'), # Find your endpoint in the control panel, under Settings. Prepend "https://".
+                            config=botocore.config.Config(s3={'addressing_style': 'virtual'}), # Configures to use subdomain/virtual calling format.
+                            region_name=os.getenv('SPACES_REGION'), # Use the region in your endpoint.
+                            aws_access_key_id= os.getenv('SPACES_KEY'), # Access key pair. You can create access key pairs using the control panel or API.
+                            aws_secret_access_key=os.getenv('SPACES_SECRET')) # Secret access key defined through an environment variable.
+    # Step 3: Call the put_object command and specify the file to upload.
+    with open(InvoicePDF, 'rb') as invoice_file:  # Open the PDF file in binary mode
+        client.put_object(
+            Bucket='invoice-agent-bucket',  # The path to the directory you want to upload the object to, starting with your Space name.
+            Key=f'invoices/{datetime.now().year}/{datetime.now().month}/{InvoicePDF}',  # Object key, referenced whenever you want to access this file later.
+            Body=invoice_file,  # The object's contents.
+            ACL='private',  # Defines Access-control List (ACL) permissions, such as private or public.
+            Metadata={  # Defines metadata tags.
+                'x-amz-meta-my-key': InvoicePDF
+    )
     
     logger.info("CrewAI task completed successfully")
     return InvoicePDF,analysis, invoice_dictionary
@@ -185,21 +205,46 @@ async def start_job(data: StartJobRequest):
         job_id = str(uuid.uuid4())
         agent_identifier = os.getenv("AGENT_IDENTIFIER")
 
+        # Construct the input text from the invoice information
+        input_text = f"""
+        Sender: {data.sender}
+        Sender Address: {data.sender_address}
+        Sender Country: {data.sender_country}
+        Sender Contact: {data.sender_contact}
+        Sender Tax Number: {data.sender_tax_number}
+        Recipient: {data.recipient}
+        Recipient Address: {data.recipient_address}
+        Recipient Country: {data.recipient_country}
+        Recipient Contact: {data.recipient_contact}
+        Recipient Tax Number: {data.recipient_tax_number}
+        Due Date: {data.due_date}
+        Transactions: {data.transactions}
+        Logo: {data.logo}
+        Payment Instructions: {data.payment_instructions}
+        Invoice Notes: {data.invoice_notes}
+        Extra Charges: {data.extra_charges}
+        Taxes: {data.taxes}
+        Transaction Notes: {data.transaction_notes}
+        Currency: {data.currency}
+        """
         
+        # Log the input text (truncate if too long)
+        truncated_input = input_text[:100] + "..." if len(input_text) > 100 else input_text
+        logger.info(f"Received job request with input: '{truncated_input}'")
         logger.info(f"Starting job {job_id} with agent {agent_identifier}")
 
         payment_amount = os.getenv("PAYMENT_AMOUNT", "10000000")  # Default 10 ADA
-        payment_unit = os.getenv("PAYMENT_UNIT", "lovelace") # Default lovelace
+        payment_unit = os.getenv("PAYMENT_UNIT", "lovelace")  # Default lovelace
 
         amounts = [Amount(amount=payment_amount, unit=payment_unit)]
         logger.info(f"Using payment amount: {payment_amount} {payment_unit}")
-        
+
         # Create a payment request using Masumi
         payment = Payment(
             agent_identifier=agent_identifier,
-            #amounts=amounts,
             config=config,
             identifier_from_purchaser=data.identifier_from_purchaser,
+            # Include any other necessary parameters
         )
 
         logger.info("Creating payment request...")
@@ -213,18 +258,19 @@ async def start_job(data: StartJobRequest):
             "payment_id": payment_id,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "result": None,
-            "invoice_info":None,
+            "invoice_info": None,
             "input_data": data,
             "legal_analysis": None,
             "identifier_from_purchaser": data.identifier_from_purchaser
         }
+
         async def payment_callback(payment_id: str):
-                await handle_payment_status(job_id, payment_id)
+            await handle_payment_status(job_id, payment_id)
 
         payment_instances[job_id] = payment
         logger.info(f"Starting payment status monitoring for job {job_id}")
         await payment.start_status_monitoring(payment_callback)
-        # Store the generated PDF
+
         return {
             "status": "success",
             "job_id": job_id,
