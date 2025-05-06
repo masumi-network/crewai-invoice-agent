@@ -16,3 +16,4 @@ masumi
 pydantic
 python-multipart
 httpx
+boto3
