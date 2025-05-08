@@ -168,7 +168,7 @@ async def execute_crew_task(data:StartJobRequest) -> dict:
      # Initialize an empty list for extra information
 
     InvoicePDF = export_invoice_to_pdf(result)
-
+    
     #logger.info(f"Starting CrewAI task with input: {input_data}")
     # Step 2: The new session validates your request and directs it to your Space's specified endpoint using the AWS SDK.
     session = boto3.session.Session()
@@ -184,19 +184,42 @@ async def execute_crew_task(data:StartJobRequest) -> dict:
             Bucket='invoice-agent-bucket',  # The path to the directory you want to upload the object to, starting with your Space name.
             Key=f'invoices/{datetime.now().year}/{datetime.now().month}/{InvoicePDF}',  # Object key, referenced whenever you want to access this file later.
             Body=invoice_file,  # The object's contents.
-            ACL='private',  # Defines Access-control List (ACL) permissions, such as private or public.
+            ACL='public-read',  # Defines Access-control List (ACL) permissions, such as private or public.
             Metadata={  # Defines metadata tags.
                 'x-amz-meta-my-key': InvoicePDF
             }
         )
-
+  
     logger.info("CrewAI task completed successfully")
 
-    return InvoicePDF,analysis, invoice_dictionary
+    return InvoicePDF,analysis,invoice_dictionary
     
 # ─────────────────────────────────────────────────────────────────────────────
 # 1) Start Job (MIP-003: /start_job)
 # ─────────────────────────────────────────────────────────────────────────────
+@app.post("/force_run")
+async def force_run(data: StartJobRequest):
+    """
+    Executes the crew task directly without involving the payment process.
+    Fulfills MIP-003 /force_run endpoint.
+    """
+    #try:
+        # Execute the crew task
+    result, analysis, invoice_dictionary = await execute_crew_task(data)
+
+    return {
+        "status": "success",
+        "result": result,
+        "analysis": analysis,
+        "invoice_info": invoice_dictionary
+    }
+    """
+    except Exception as e:
+        logger.error(f"Error in force_run: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while executing the crew task."
+        )"""
 @app.post("/start_job")
 async def start_job(data: StartJobRequest):
     """

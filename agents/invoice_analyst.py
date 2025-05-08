@@ -11,6 +11,7 @@ from logging_config import get_logger
 logger = logging.getLogger(__name__)
 # Define the Pydantic model for the blog
 class Invoice(BaseModel):
+    invoice_info: str
     sender_name: str
     sender_address: list
     sender_contact:str
@@ -36,12 +37,6 @@ class Invoice(BaseModel):
     tax_values: list
     currency:str
 
-    #charges: float  # Optional list of charges
-    #charges_value: float  # Optional charges value, can be None
-    #currency: str
-    #extra_info: str 
-
-    
 class LegalAnalysis(BaseModel):
     analysis: str
 
@@ -51,8 +46,8 @@ class Invoice_Agents:
     Invoice creator agent using CrewAI.
     """
     
-    def __init__(self,verbose = True, invoice_text: str = None,legal_data:str = None,logger = None):
-        self.verbose = verbose
+    def __init__(self, invoice_text: str = None,legal_data:str = None,logger = None):
+        self.verbose = True
         self.logger = logger or get_logger(__name__)
         self.invoice_text = invoice_text  
         self.legal_data = legal_data
@@ -130,7 +125,7 @@ class Invoice_Agents:
             10. Recipient tax number
             11. Due date (convert to NUM MONTH YEAR e.g. 01 June 2019)
             12. Transactions (as a list)
-            13. Quantities (as a list)
+            13. Quantities (as a list), if none are provided for an item, assume the quanity is 1
             14. Unit prices (as a list)
             15. Unit totals (as a list)
             16. Total amount
@@ -139,9 +134,9 @@ class Invoice_Agents:
             19. Invoice notes
             20. Extra charges (just the charges, not the amounts or taxes, have each unique charge be its own element, if its a percentage charge, add the percentage in brackets beside it. e.g., Late Fee(10%))
             21. Charge amounts (just the raw values, if the amout is that of a percentage (if declared as a percentage),add it as a decimal percent and add an appropriate % symbol. e.g. Late Fee 5% -> 0.05%
-                And if the charge is negative i.e. a discount, add the value as a negative. e.g. Early discount -$20 -> -20)
+                And if the charge is negative i.e. a discount, add the value as a negative. e.g. Early discount -$20 -> -20. if none are provided, assume it is 0)
             22. Taxes (provided tax such as VAT, Sales Tax, Goods and services Tax ETC)  if its a percentage charge, add the percentage in brackets beside it. e.g., VAT(10%)
-            23. Tax values (write these as decimal tax values e.g. 12% -> 0.12) NO PERCENTAGE SYMBOLS
+            23. Tax values (write these as decimal tax values e.g. 12% -> 0.12) NO PERCENTAGE SYMBOLS. if none are provided, assume it is 0
             24. Currency (Write as 3 or 4 Letter abbreviation. e.g. USD)
 
 
