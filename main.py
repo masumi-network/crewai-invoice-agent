@@ -59,7 +59,8 @@ config = Config(
 # ─────────────────────────────────────────────────────────────────────────────
 
 class StartJobRequest(BaseModel):
-    identifier_from_purchaser: str
+    
+    """
     sender: str
     sender_address: str
     sender_country: str
@@ -79,9 +80,22 @@ class StartJobRequest(BaseModel):
     taxes: str
     transaction_notes:str
     currency:str
+"""
+    identifier_from_purchaser: str
+    input_data: dict[str, str]
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "identifier_from_purchaser": "example_purchaser_123",
+                "input_data": {
+                    "invoice_info": "Generate an invoice from SENDER: John Doe, 123 Example Street, Switzerland, JohnDoe@Email.com, Tax number: 12345678 to RECIPIENT: Jane Doe, 456 Example Street, Switzerland, JaneDoe@Email.com, Tax number:5678910. Due on 1/1/15 for 2 ITEM1 for 200 euro each and 1 ITEM2 for 100 euro. Company logo: filepath/to/local/image. To by payed to IBAN:1234567. SAMPLE INVOICE NOTE, Extra charges: Late fee 10 euro. 10% VAT currency is Euro."
+                }
+            }
+        }
 
 class ProvideInputRequest(BaseModel):
     job_id: str
+    """
     sender: str
     sender_address: str
     sender_country: str
@@ -101,11 +115,13 @@ class ProvideInputRequest(BaseModel):
     taxes: str
     transaction_notes:str
     currency:str
+    """
 # ─────────────────────────────────────────────────────────────────────────────
 # CrewAI Task Execution
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def execute_crew_task(data:StartJobRequest) -> dict:
+async def execute_crew_task(input_data:str) -> str:
+    """
     invoice_dictionary = {
         "sender": str(data.sender),
         "sender_address": str(data.sender_address),
@@ -128,7 +144,7 @@ async def execute_crew_task(data:StartJobRequest) -> dict:
         "currency": str(data.currency)
     }
 
-    invoice_info = f"""
+    invoice_info = f
     Sender: {invoice_dictionary["sender"]}
     Sender Address: {invoice_dictionary["sender_address"]}
     Sender Country: {invoice_dictionary["sender_country"]}
@@ -157,17 +173,17 @@ async def execute_crew_task(data:StartJobRequest) -> dict:
 
     Currency: {invoice_dictionary["currency"]}
     """
-
-    legal_info = search_invoice_regulations(data.sender_country, data.recipient_country)
-    cleaning_crew = Cleaning_Agents(legal_info['content'])
-    legal_info = cleaning_crew.clean_Data()
-    invoice_crew = Invoice_Agents(invoice_info, legal_info,logger = logger)
+    
+    #legal_info = search_invoice_regulations(data.sender_country, data.recipient_country)
+    #cleaning_crew = Cleaning_Agents(legal_info['content'])
+    #legal_info = cleaning_crew.clean_Data()
+    invoice_crew = Invoice_Agents(input_data, "None",logger = logger)
     result,analysis = invoice_crew.run_analysis()
-
+    InvoicePDF = export_invoice_to_pdf(result)
     # Initialize extra_info in the result
      # Initialize an empty list for extra information
 
-    InvoicePDF = export_invoice_to_pdf(result)
+    
     
     #logger.info(f"Starting CrewAI task with input: {input_data}")
     # Step 2: The new session validates your request and directs it to your Space's specified endpoint using the AWS SDK.
@@ -192,7 +208,7 @@ async def execute_crew_task(data:StartJobRequest) -> dict:
   
     logger.info("CrewAI task completed successfully")
 
-    return InvoicePDF,analysis,invoice_dictionary
+    return InvoicePDF,analysis
     
 # ─────────────────────────────────────────────────────────────────────────────
 # 1) Start Job (MIP-003: /start_job)
@@ -205,13 +221,12 @@ async def force_run(data: StartJobRequest):
     """
     #try:
         # Execute the crew task
-    result, analysis, invoice_dictionary = await execute_crew_task(data)
+    result, analysis,= await execute_crew_task(data)
 
     return {
         "status": "success",
         "result": result,
         "analysis": analysis,
-        "invoice_info": invoice_dictionary
     }
     """
     except Exception as e:
@@ -231,30 +246,9 @@ async def start_job(data: StartJobRequest):
         agent_identifier = os.getenv("AGENT_IDENTIFIER")
 
         # Construct the input text from the invoice information
-        input_text = f"""
-        Sender: {data.sender}
-        Sender Address: {data.sender_address}
-        Sender Country: {data.sender_country}
-        Sender Contact: {data.sender_contact}
-        Sender Tax Number: {data.sender_tax_number}
-        Recipient: {data.recipient}
-        Recipient Address: {data.recipient_address}
-        Recipient Country: {data.recipient_country}
-        Recipient Contact: {data.recipient_contact}
-        Recipient Tax Number: {data.recipient_tax_number}
-        Due Date: {data.due_date}
-        Transactions: {data.transactions}
-        Logo: {data.logo}
-        Payment Instructions: {data.payment_instructions}
-        Invoice Notes: {data.invoice_notes}
-        Extra Charges: {data.extra_charges}
-        Taxes: {data.taxes}
-        Transaction Notes: {data.transaction_notes}
-        Currency: {data.currency}
-        """
-        
         # Log the input text (truncate if too long)
-        truncated_input = input_text[:100] + "..." if len(input_text) > 100 else input_text
+        invoice_info  = data.input_data["invoice_info"]
+        truncated_input = invoice_info[:100] + "..." if len(invoice_info) > 100 else invoice_info
         logger.info(f"Received job request with input: '{truncated_input}'")
         logger.info(f"Starting job {job_id} with agent {agent_identifier}")
 
@@ -269,6 +263,7 @@ async def start_job(data: StartJobRequest):
             agent_identifier=agent_identifier,
             config=config,
             identifier_from_purchaser=data.identifier_from_purchaser,
+            input_data = data.input_data
             # Include any other necessary parameters
         )
 
@@ -280,12 +275,11 @@ async def start_job(data: StartJobRequest):
 
         jobs[job_id] = {
             "status": "awaiting payment",
+            "payment_status":"pending",
             "payment_id": payment_id,
             "created_at": datetime.now(timezone.utc).isoformat(),
+            "input_data": data.input_data,
             "result": None,
-            "invoice_info": None,
-            "input_data": data,
-            "legal_analysis": None,
             "identifier_from_purchaser": data.identifier_from_purchaser
         }
 
@@ -332,7 +326,7 @@ async def handle_payment_status(job_id: str, payment_id: str) -> None:
         logger.info(f"Input data: {jobs[job_id]["input_data"]}")
 
         # Execute the AI task   
-        result,legal,invoice_dictionary = await execute_crew_task(jobs[job_id]["invoice_info"])
+        result,legal,invoice_dictionary = await execute_crew_task(jobs[job_id]["input_data"])
 
         logger.info(f"Crew task completed for job {job_id}")
         # Convert result to string if it's not already
@@ -500,14 +494,16 @@ async def health():
 # ─────────────────────────────────────────────────────────────────────────────
 # 7) Provide Input (MIP-003: /provide_input)
 # ─────────────────────────────────────────────────────────────────────────────
+"""
 @app.post("/provide_input")
 async def provide_input(request_body: ProvideInputRequest):
-    """
+    
     Allows users to send additional input.
     Fulfills MIP-003 /provide_input endpoint.
     
     In this example we can add any additional info to the invoice, or fill in any required information.
-    """
+    
+
     job_id = request_body.job_id
 
     if job_id not in jobs:
@@ -523,7 +519,7 @@ async def provide_input(request_body: ProvideInputRequest):
             job["invoice_info"][key] = value
        
     # Update the Invoice_Agents crew with the modified invoice_info
-    invoice_info = f"""
+    invoice_info = f
     Sender: {job["invoice_info"]["sender"]}
     Sender Address: {job["invoice_info"]["sender_address"]}
     Sender Country: {job["invoice_info"]["sender_country"]}
@@ -552,7 +548,7 @@ async def provide_input(request_body: ProvideInputRequest):
 
     Currency: {job["invoice_info"]["currency"]}
 
-    """
+    
     invoice_crew = Invoice_Agents(invoice_info, job["legal_analysis"])
 
     result, legal = invoice_crew.run_analysis()  # Re-run analysis with updated info
@@ -571,7 +567,7 @@ async def provide_input(request_body: ProvideInputRequest):
         "current_pdf": InvoicePDF,
         "legal_analysis":legal
     }
-
+"""
 # ─────────────────────────────────────────────────────────────────────────────
 # Main logic if called as a script
 # ─────────────────────────────────────────────────────────────────────────────

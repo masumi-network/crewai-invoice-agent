@@ -121,7 +121,7 @@ class Invoice_Agents:
             6. Recipient Name
             7. Recipient address (as a list,Seperate the different sections as seperate elements in the list, like street name, building name etc)
             8. Recipient contact (email address or phone number etc)
-            9. Recipient Country
+            9. Recipient country
             10. Recipient tax number
             11. Due date (convert to NUM MONTH YEAR e.g. 01 June 2019)
             12. Transactions (as a list)
@@ -133,10 +133,11 @@ class Invoice_Agents:
             18. Payment instructions
             19. Invoice notes
             20. Extra charges (just the charges, not the amounts or taxes, have each unique charge be its own element, if its a percentage charge, add the percentage in brackets beside it. e.g., Late Fee(10%))
-            21. Charge amounts (just the raw values, if the amout is that of a percentage (if declared as a percentage),add it as a decimal percent and add an appropriate % symbol. e.g. Late Fee 5% -> 0.05%
+            21. Charge amounts (just the raw values, if the amout is that of a percentage (if declared as a percentage),add it as a decimal. e.g. Late Fee 5% -> 0.05
                 And if the charge is negative i.e. a discount, add the value as a negative. e.g. Early discount -$20 -> -20. if none are provided, assume it is 0)
+                    
             22. Taxes (provided tax such as VAT, Sales Tax, Goods and services Tax ETC)  if its a percentage charge, add the percentage in brackets beside it. e.g., VAT(10%)
-            23. Tax values (write these as decimal tax values e.g. 12% -> 0.12) NO PERCENTAGE SYMBOLS. if none are provided, assume it is 0
+            23. Tax values (write these as decimal tax values e.g. 12% -> 0.12) NO PERCENTAGE SYMBOLS.
             24. Currency (Write as 3 or 4 Letter abbreviation. e.g. USD)
 
 
@@ -149,7 +150,10 @@ class Invoice_Agents:
             6. For missing information, use empty lists [] for list fields, empty string "" for string fields, and 0.0 for the total
             7. Do not include any comments or explanations in the output
             8. The output must be a valid Python dictionary that can be directly used to create an Invoice object
-
+            9. For ANY value, if the value cannot be analysed from the input data, that value is a string: "None"
+            10. For the invoice notes and payment notes, include the ALL TEXT in the note
+            11. For taxes and extra charges, do not try to add the values yourself i.e. Late fee ($10), the values will be added by another function
+            12. For the Items, only include the RAW ITEMS excluding amounts and pricaaaa
            
             """,
             agent=invoice_parser,

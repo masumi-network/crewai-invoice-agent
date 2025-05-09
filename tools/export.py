@@ -151,7 +151,7 @@ def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) ->
 
     # Transaction Data
     pdf.set_font("Helvetica", "", 12)
-    subtotal = 0
+    
 
     for i in range(len(invoice_data['transactions'])):
         description = invoice_data['transactions'][i]
@@ -192,9 +192,9 @@ def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) ->
     pdf.ln(5)
 
     total = float(invoice_data['total'])
-    
+    subtotal = 0
 
-    if len(invoice_data['extra_charges']) >= 1 and invoice_data['extra_charges'][0] != "string":
+    if invoice_data["extra_charges"] != "None":
         for i in range(len(invoice_data['extra_charges'])):
             pdf.set_font("Helvetica", "B", 12)
             pdf.cell(30, 10, "", 0) 
@@ -203,16 +203,17 @@ def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) ->
 
             if(invoice_data['extra_charges'][i][-2] == '%'):
                 pdf.set_font("Helvetica", "", 12)
-                pdf.cell(40, 10, str(f"{subtotal* float(invoice_data['charges_amounts'][i][:-1]):.2f}"), 0 )
-                total += float(total * float(invoice_data['charges_amounts'][i]))
+                pdf.cell(40, 10, str(f"{float(invoice_data['charges_amounts'][i])}"), 0 )
+                subtotal += float(total * float(invoice_data['charges_amounts'][i]))
             else:
                 pdf.cell(40, 10, str(invoice_data['charges_amounts'][i]), 0 )
-                total += float(invoice_data['charges_amounts'][i])
+                subtotal += float(invoice_data['charges_amounts'][i])
 
     final_total = total
     pdf.set_font("Helvetica", "B", 12)
-    if len(invoice_data['taxes']) >= 1 and invoice_data['taxes'] != "string":
+    if len(invoice_data['taxes']) != "None":
         for i in range (len(invoice_data['taxes'])):
+            pdf.ln(5)
             pdf.cell(30, 10, "", 0) 
             pdf.cell(80, 10, "", 0)
             pdf.cell(40, 10, str(invoice_data['taxes'][i]), 0)
@@ -220,23 +221,27 @@ def export_invoice_to_pdf(invoice_data: Dict, filename: Optional[str] = None) ->
             pdf.cell(40, 10, str(f"{total * float(invoice_data['tax_values'][i]):.2f}"), 0)
             final_total += float(total * float(invoice_data['tax_values'][i]))
         
+    final_total += subtotal
     pdf.ln(5)
 
     current_x, current_y = pdf.get_x(), pdf.get_y()
     pdf.line(current_x+105,current_y+2,current_x+170    ,current_y+2)
     pdf.cell(30, 10, "", 0)
     pdf.cell(80, 10, "", 0)
-    pdf.cell(40, 10, "Total", 0)
+    pdf.cell(40, 10, f"Total ({invoice_data['currency']})", 0)
     pdf.cell(40, 10, str(f"{final_total:.2f}"), 0)
     pdf.ln(5)
 
-    pdf.set_xy(x,y)
-    pdf.set_font("Helvetica", "", 12)  # Set font for payment notes
-    pdf.cell(0, 10, "Payment Instructions:", ln=True, align="L")  # Label for payment notes
-    pdf.multi_cell(0, 7, invoice_data['payment_instructions'], align="L")  # Payment notes field
-    pdf.ln(10)
-    pdf.cell(0, 5, "Invoice Notes:", ln=True, align="L")  # Label for payment notes
-    pdf.multi_cell(0, 7, invoice_data['invoice_notes'], align="L")  # Payment notes field
+    if invoice_data['payment_instructions'] != "None":
+        pdf.set_xy(x,y)
+        pdf.set_font("Helvetica", "", 12)  # Set font for payment notes
+        pdf.cell(0, 10, "Payment Instructions:", ln=True, align="L")  # Label for payment notes
+        pdf.multi_cell(0, 7, invoice_data['payment_instructions'], align="L")  # Payment notes field
+        pdf.ln(10)
+
+    if invoice_data['invoice_notes'] != "None": 
+        pdf.cell(0, 5, "Invoice Notes:", ln=True, align="L")  # Label for payment notes
+        pdf.multi_cell(0, 7, invoice_data['invoice_notes'], align="L")  # Payment notes field
 
 #
     pdf.output(filename)
