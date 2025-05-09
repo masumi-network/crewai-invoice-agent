@@ -213,28 +213,7 @@ async def execute_crew_task(input_data:str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # 1) Start Job (MIP-003: /start_job)
 # ─────────────────────────────────────────────────────────────────────────────
-@app.post("/force_run")
-async def force_run(data: StartJobRequest):
-    """
-    Executes the crew task directly without involving the payment process.
-    Fulfills MIP-003 /force_run endpoint.
-    """
-    #try:
-        # Execute the crew task
-    result, analysis,= await execute_crew_task(data)
 
-    return {
-        "status": "success",
-        "result": result,
-        "analysis": analysis,
-    }
-    """
-    except Exception as e:
-        logger.error(f"Error in force_run: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while executing the crew task."
-        )"""
 @app.post("/start_job")
 async def start_job(data: StartJobRequest):
     """
